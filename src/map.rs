@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use rand::prelude::*;
 
-pub type Point = (f32, f32);
+pub type Point = (u16, u16);
 pub type RegionId = usize;
 
 #[derive(Debug)]
@@ -13,22 +13,27 @@ pub struct Map {
 
 #[derive(Debug)]
 pub struct Region {
-    pub pivot: (u16, u16),
+    /// seed point of the region
+    pub pivot: Point,
+
+    /// the farthest points of the region that are still part of the region
     pub boundary: Vec<Point>,
+
+    /// all the regions that share a border this region
     pub neighbors: HashSet<RegionId>,
 }
 
 impl Map {
-    pub fn voronoi_like(rng: &mut impl Rng, (w, h): (u8, u8), npivots: usize) -> Self {
-        assert!(w > 2);
-        assert!(h > 2);
+    pub fn voronoi_like(rng: &mut impl Rng, (w, h): (u16, u16), npivots: usize) -> Self {
+        assert!(w > 0);
+        assert!(h > 0);
 
         // TODO: find a better way to generate distinct pivot points
         let mut regions = (0..npivots)
             .map(|_| Region {
                 pivot: {
-                    let x = rng.gen_range(1, u16::from(w) - 1);
-                    let y = rng.gen_range(1, u16::from(h) - 1);
+                    let x = rng.gen_range(0, w);
+                    let y = rng.gen_range(0, h);
                     (x, y)
                 },
                 boundary: vec![],
@@ -48,9 +53,6 @@ impl Map {
             canvas[y][x] = region_id;
         }
 
-        // TODO: it seems boundaries are a bit too thick in some cases, try to stick to boundaries
-        // of 1pix so that it's easier to generate non piexelated boundaries in case of svg output
-        // or similar
         loop {
             let mut changed = false;
 
@@ -62,16 +64,7 @@ impl Map {
                         let ox = i32::from(p.0);
                         let oy = i32::from(p.1);
 
-                        [
-                            // (ox - 1, oy - 1),
-                            // (ox - 1, oy + 1),
-                            // (ox + 1, oy - 1),
-                            // (ox + 1, oy + 1),
-                            (ox - 1, oy),
-                            (ox, oy - 1),
-                            (ox, oy + 1),
-                            (ox + 1, oy),
-                        ]
+                        [(ox - 1, oy), (ox, oy - 1), (ox, oy + 1), (ox + 1, oy)]
                     };
 
                     for &(x, y) in &neighbors {
@@ -81,10 +74,9 @@ impl Map {
                         let x = x as u16;
                         let y = y as u16;
 
-                        let on_boundary =
-                            x == 0 || x == u16::from(w) - 1 || y == 0 || y == u16::from(h) - 1;
+                        let on_boundary = x == 0 || x == w - 1 || y == 0 || y == h - 1;
 
-                        let mut closest_rid = canvas[y as usize][x as usize];
+                        let mut closest_rid = canvas[usize::from(y)][usize::from(x)];
                         if closest_rid >= regions.len() {
                             canvas[usize::from(y)][usize::from(x)] = region_id;
                             closest_rid = region_id;
@@ -94,14 +86,9 @@ impl Map {
                         if closest_rid != region_id {
                             regions[region_id].neighbors.insert(closest_rid);
                             regions[closest_rid].neighbors.insert(region_id);
-                            regions[region_id].boundary.push((
-                                (f32::from(x) + f32::from(p.0)) / 2.0,
-                                (f32::from(y) + f32::from(p.1)) / 2.0,
-                            ));
+                            regions[region_id].boundary.push(*p);
                         } else if on_boundary {
-                            regions[region_id]
-                                .boundary
-                                .push((f32::from(x), f32::from(y)));
+                            regions[region_id].boundary.push((x, y));
                         }
                     }
                 }
