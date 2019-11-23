@@ -11,7 +11,7 @@ fn main() {
     let dim = (80, 24);
     let npivots = 10;
 
-    let m = Map::voronoi_like(&mut thread_rng(), dim, npivots);
+    let m = Map::voronoi_like(Map::random_pivots(&mut thread_rng(), npivots, dim), dim);
     let cm = ColorMap::color(&m).unwrap();
     let regions = &m.regions;
 

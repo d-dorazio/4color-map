@@ -24,24 +24,30 @@ pub struct Region {
 }
 
 impl Map {
-    pub fn voronoi_like(rng: &mut impl Rng, (w, h): (u16, u16), npivots: usize) -> Self {
-        assert!(w > 0);
-        assert!(h > 0);
+    /// generate a set of random distinct pivots, useful to call `voronoi_like` to generate a new
+    /// `Map`.
+    pub fn random_pivots(rng: &mut impl Rng, npivots: u16, (w, h): (u16, u16)) -> HashSet<Point> {
+        let regions = (0..npivots)
+            .map(|_| {
+                let x = rng.gen_range(0, w);
+                let y = rng.gen_range(0, h);
+                (x, y)
+            })
+            .collect::<HashSet<_>>();
 
-        // TODO: find a better way to generate distinct pivot points
-        let mut regions = (0..npivots)
-            .map(|_| Region {
-                pivot: {
-                    let x = rng.gen_range(0, w);
-                    let y = rng.gen_range(0, h);
-                    (x, y)
-                },
+        regions
+    }
+
+    /// generate a new voronoi like `Map` using the given `pivots` points as the seeds.
+    pub fn voronoi_like(pivots: HashSet<Point>, (w, h): (u16, u16)) -> Self {
+        let mut regions = pivots
+            .into_iter()
+            .map(|pivot| Region {
+                pivot,
                 boundary: vec![],
                 neighbors: HashSet::new(),
             })
             .collect::<Vec<_>>();
-        regions.sort_by_key(|r| r.pivot);
-        regions.dedup_by_key(|r| r.pivot);
 
         let mut canvas = vec![vec![regions.len(); usize::from(w)]; usize::from(h)];
         let mut boundaries = Vec::with_capacity(regions.len());
