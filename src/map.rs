@@ -120,3 +120,26 @@ impl Map {
         }
     }
 }
+
+impl Region {
+    pub fn connected_boundary(&self) -> Vec<Point> {
+        let mut b = self.boundary.iter().cloned().collect::<Vec<_>>();
+
+        for i in 1..b.len() {
+            let p = b[i - 1];
+            let closest_i = i + b[i..]
+                .iter()
+                .enumerate()
+                .min_by_key(|(_, pp)| {
+                    (i32::from(pp.0) - i32::from(p.0)).abs()
+                        + (i32::from(pp.1) - i32::from(p.1)).abs()
+                })
+                .map(|(i, _)| i)
+                .unwrap();
+
+            b.swap(i, closest_i);
+        }
+
+        b
+    }
+}
