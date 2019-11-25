@@ -17,7 +17,7 @@ pub struct Region {
     pub pivot: Point,
 
     /// the farthest points of the region that are still part of the region
-    pub boundary: Vec<Point>,
+    pub boundary: HashSet<Point>,
 
     /// all the regions that share a border this region
     pub neighbors: HashSet<RegionId>,
@@ -44,7 +44,7 @@ impl Map {
             .into_iter()
             .map(|pivot| Region {
                 pivot,
-                boundary: vec![],
+                boundary: HashSet::new(),
                 neighbors: HashSet::new(),
             })
             .collect::<Vec<_>>();
@@ -92,9 +92,9 @@ impl Map {
                         if closest_rid != region_id {
                             regions[region_id].neighbors.insert(closest_rid);
                             regions[closest_rid].neighbors.insert(region_id);
-                            regions[region_id].boundary.push(*p);
+                            regions[region_id].boundary.insert(*p);
                         } else if on_boundary {
-                            regions[region_id].boundary.push((x, y));
+                            regions[region_id].boundary.insert((x, y));
                         }
                     }
                 }
