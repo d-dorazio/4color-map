@@ -1,3 +1,7 @@
+use std::fs;
+use std::io;
+use std::io::Write;
+
 mod colormap;
 mod map;
 
@@ -7,7 +11,7 @@ use rand::prelude::*;
 use crate::colormap::*;
 use crate::map::Map;
 
-fn main() {
+fn main() -> io::Result<()> {
     let dim = (80, 24);
     let npivots = 10;
 
@@ -67,4 +71,38 @@ fn main() {
         let s = r.into_iter().collect::<String>();
         println!("{}", s);
     }
+
+    {
+        let mut f = fs::File::create("map.svg")?;
+        writeln!(
+            f,
+            r#"<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
+<svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 {width} {height}" >
+<rect width="{width}" height="{height}" stroke="none" fill="black" />"#,
+            width = dim.0,
+            height = dim.1
+        )?;
+        for (rid, r) in regions.iter().enumerate() {
+            let points = r
+                .connected_boundary()
+                .into_iter()
+                .map(|(x, y)| format!("{},{} ", x, y))
+                .collect::<String>();
+            writeln!(
+                f,
+                r#"<polygon points="{}" stroke="none" fill="{}" />"#,
+                points,
+                match cm.color_of_region(rid) {
+                    Color::C1 => "red",
+                    Color::C2 => "blue",
+                    Color::C3 => "green",
+                    Color::C4 => "yellow",
+                }
+            )?
+        }
+        writeln!(f, "</svg>")?;
+    }
+
+    Ok(())
 }
