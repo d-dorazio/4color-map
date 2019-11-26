@@ -1,24 +1,81 @@
-use std::fs;
-use std::io;
-use std::io::Write;
-
 mod colormap;
 mod map;
 
+use std::fs;
+use std::io;
+use std::io::Write;
+use std::path;
+
 use colored::Colorize;
 use rand::prelude::*;
+use structopt::StructOpt;
 
 use crate::colormap::*;
 use crate::map::Map;
 
+/// Simple program to generate maps colored following the 4 color theorem.
+#[derive(Debug, StructOpt)]
+struct Opts {
+    /// Width of the map
+    #[structopt(short, long)]
+    width: Option<u16>,
+
+    /// Height of the map
+    #[structopt(short, long)]
+    height: Option<u16>,
+
+    /// Maximum number of regions in the map
+    #[structopt(short, long, default_value = "5")]
+    nregions: u16,
+
+    #[structopt(subcommand)]
+    format: Format,
+}
+
+#[derive(Debug, StructOpt)]
+enum Format {
+    /// Print the map directly to the terminal
+    Terminal,
+
+    /// Render the map as an svg
+    Svg {
+        /// Path where to write the map as svg
+        #[structopt(short, long, default_value = "map.svg")]
+        filename: path::PathBuf,
+    },
+}
+
+impl Format {
+    pub fn default_dimensions(&self) -> (u16, u16) {
+        match self {
+            Format::Terminal => (80, 24),
+            Format::Svg { .. } => (400, 800),
+        }
+    }
+}
+
 fn main() -> io::Result<()> {
-    let dim = (80, 24);
-    let npivots = 10;
+    let opts = Opts::from_args();
 
-    let m = Map::voronoi_like(Map::random_pivots(&mut thread_rng(), npivots, dim), dim);
+    let (default_w, default_h) = opts.format.default_dimensions();
+    let dim = (
+        opts.width.unwrap_or(default_w),
+        opts.height.unwrap_or(default_h),
+    );
+
+    let pivots = Map::random_pivots(&mut thread_rng(), opts.nregions, dim);
+    let m = Map::voronoi_like(pivots, dim);
     let cm = ColorMap::color(&m).unwrap();
-    let regions = &m.regions;
 
+    match opts.format {
+        Format::Terminal => dump_terminal(dim, &m, &cm),
+        Format::Svg { filename } => dump_svg(&filename, dim, &m, &cm)?,
+    }
+
+    Ok(())
+}
+
+fn dump_terminal(dim: (u16, u16), m: &Map, cm: &ColorMap) {
     let c1 = " ".on_red().dimmed().to_string();
     let c2 = " ".on_blue().dimmed().to_string();
     let c3 = " ".on_green().dimmed().to_string();
@@ -45,7 +102,7 @@ fn main() -> io::Result<()> {
     // let b2 = "*".on_blue().to_string();
     // let b3 = "*".on_green().to_string();
     // let b4 = "*".on_yellow().to_string();
-    // for (rid, r) in regions.iter().enumerate() {
+    // for (rid, r) in m.regions.iter().enumerate() {
     //     for (x, y) in &r.boundary {
     //         dbg_display[usize::from(*y)][usize::from(*x)] = match cm.color_of_region(rid) {
     //             Color::C1 => &b1,
@@ -56,7 +113,7 @@ fn main() -> io::Result<()> {
     //     }
     // }
 
-    for (rid, r) in regions.iter().enumerate() {
+    for (rid, r) in m.regions.iter().enumerate() {
         let x = usize::from(r.pivot.0);
         let y = usize::from(r.pivot.1);
 
@@ -71,38 +128,42 @@ fn main() -> io::Result<()> {
         let s = r.into_iter().collect::<String>();
         println!("{}", s);
     }
+}
 
-    {
-        let mut f = fs::File::create("map.svg")?;
-        writeln!(
-            f,
-            r#"<?xml version="1.0" encoding="UTF-8"?>
+fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -> io::Result<()> {
+    let mut f = fs::File::create(filename)?;
+
+    writeln!(
+        f,
+        r#"<?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" "http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd">
 <svg xmlns="http://www.w3.org/2000/svg" version="1.1" viewBox="0 0 {width} {height}" >
 <rect width="{width}" height="{height}" stroke="none" fill="black" />"#,
-            width = dim.0,
-            height = dim.1
-        )?;
-        for (rid, r) in regions.iter().enumerate() {
-            let points = r
-                .connected_boundary()
-                .into_iter()
-                .map(|(x, y)| format!("{},{} ", x, y))
-                .collect::<String>();
-            writeln!(
-                f,
-                r#"<polygon points="{}" stroke="none" fill="{}" />"#,
-                points,
-                match cm.color_of_region(rid) {
-                    Color::C1 => "red",
-                    Color::C2 => "blue",
-                    Color::C3 => "green",
-                    Color::C4 => "yellow",
-                }
-            )?
-        }
-        writeln!(f, "</svg>")?;
+        width = dim.0,
+        height = dim.1
+    )?;
+
+    for (rid, r) in m.regions.iter().enumerate() {
+        let points = r
+            .connected_boundary()
+            .into_iter()
+            .map(|(x, y)| format!("{},{} ", x, y))
+            .collect::<String>();
+
+        writeln!(
+            f,
+            r#"<polygon points="{}" stroke="none" fill="{}" />"#,
+            points,
+            match cm.color_of_region(rid) {
+                Color::C1 => "red",
+                Color::C2 => "blue",
+                Color::C3 => "green",
+                Color::C4 => "yellow",
+            }
+        )?
     }
+
+    writeln!(f, "</svg>")?;
 
     Ok(())
 }
