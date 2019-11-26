@@ -27,15 +27,13 @@ impl Map {
     /// generate a set of random distinct pivots, useful to call `voronoi_like` to generate a new
     /// `Map`.
     pub fn random_pivots(rng: &mut impl Rng, npivots: u16, (w, h): (u16, u16)) -> HashSet<Point> {
-        let regions = (0..npivots)
+        (0..npivots)
             .map(|_| {
                 let x = rng.gen_range(0, w);
                 let y = rng.gen_range(0, h);
                 (x, y)
             })
-            .collect::<HashSet<_>>();
-
-        regions
+            .collect::<HashSet<_>>()
     }
 
     /// generate a new voronoi like `Map` using the given `pivots` points as the seeds.
