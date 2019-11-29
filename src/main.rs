@@ -152,13 +152,13 @@ fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -
 
         writeln!(
             f,
-            r#"<polygon points="{}" stroke="none" fill="{}" />"#,
+            r#"<polygon points="{}" stroke-width="5" stroke="black" fill="{}" />"#,
             points,
             match cm.color_of_region(rid) {
-                Color::C1 => "red",
-                Color::C2 => "blue",
-                Color::C3 => "green",
-                Color::C4 => "yellow",
+                Color::C1 => "#3604ff",
+                Color::C2 => "#ffde00",
+                Color::C3 => "#ff0041",
+                Color::C4 => "#00ffed",
             }
         )?
     }
