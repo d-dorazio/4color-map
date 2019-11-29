@@ -17,10 +17,12 @@ pub enum Color {
 }
 
 impl ColorMap {
-    pub fn color(m: &Map) -> Option<Self> {
-        Some(ColorMap {
-            possible_colors: Self::color_constrained(m, vec![0xf; m.regions.len()])?,
-        })
+    pub fn color(m: &Map) -> Option<ColorMap> {
+        Self::all_possible_colorings(m).next()
+    }
+
+    pub fn all_possible_colorings<'s>(m: &'s Map) -> impl Iterator<Item = ColorMap> + 's {
+        SolutionIter::new(m)
     }
 
     pub fn color_of_region(&self, rid: RegionId) -> Color {
@@ -48,77 +50,115 @@ impl ColorMap {
             unreachable!()
         }
     }
+}
 
-    fn color_constrained(map: &Map, mut possible_colors: Vec<u8>) -> Option<Vec<u8>> {
-        // first find regions with a single possible colors and remove that color from its
-        // neighbors until no regions change its respective colors. If any of the regions cannot be
-        // colored then this map cannot be colored. On the other hand, if all the regions have a
-        // single possible color then that's the solution.
-        loop {
-            let mut stalled = true;
-            let mut solved = true;
+#[derive(Debug)]
+struct SolutionIter<'m> {
+    stack: Vec<Vec<u8>>,
+    map: &'m Map,
+}
 
-            for rid in 0..possible_colors.len() {
-                let c = possible_colors[rid];
-                if c == 0 {
-                    return None;
-                }
-
-                if c.count_ones() != 1 {
-                    solved = false;
-                    continue;
-                }
-
-                for &neigh in &map.regions[rid].neighbors {
-                    let old = possible_colors[neigh];
-                    possible_colors[neigh] &= !c;
-
-                    if old != possible_colors[neigh] {
-                        stalled = false;
-                        solved = false;
-                    }
-                }
-            }
-
-            if solved {
-                return Some(possible_colors);
-            }
-
-            if stalled {
-                break;
-            }
+impl<'m> SolutionIter<'m> {
+    fn new(map: &'m Map) -> Self {
+        SolutionIter {
+            map,
+            stack: vec![vec![0xf; map.regions.len()]],
         }
+    }
+}
 
-        // pick the region with the smallest amount of possible colors to choose from so that we
-        // have to explore less space
-        let (candidate_i, _) = possible_colors
-            .iter()
-            .enumerate()
-            .map(|(i, &pc)| {
-                (
-                    i,
-                    ((pc >> 3) & 1) + ((pc >> 2) & 1) + ((pc >> 1) & 1) + (pc & 1),
-                )
-            })
-            .filter(|(_, pcl)| *pcl != 1)
-            .min_by_key(|(_, pcl)| *pcl)?;
+enum SolutionState {
+    CannotSolve,
+    Solved,
+    Unknown,
+}
 
-        // try all the possible colors for the candidate and recursively find a solution
-        let pcs = possible_colors[candidate_i];
-        for i in 0..4 {
-            if (pcs >> i) & 1 == 0 {
-                continue;
-            }
+impl Iterator for SolutionIter<'_> {
+    type Item = ColorMap;
 
-            let mut new_possible_colors = possible_colors.clone();
-            new_possible_colors[candidate_i] = 1 << i;
+    fn next(&mut self) -> Option<Self::Item> {
+        let has_color = |pc: u8, cid: Color| (pc & cid as u8) != 0;
+        let possible_colors_len =
+            |pc: u8| ((pc >> 3) & 1) + ((pc >> 2) & 1) + ((pc >> 1) & 1) + (pc & 1);
 
-            let sol = Self::color_constrained(map, new_possible_colors);
-            if sol.is_some() {
-                return sol;
+        while let Some(mut possible_colors) = self.stack.pop() {
+            let state = remove_conflicts(&mut possible_colors, &self.map);
+
+            match state {
+                SolutionState::Solved => return Some(ColorMap { possible_colors }),
+                SolutionState::CannotSolve => continue,
+                SolutionState::Unknown => {
+                    // pick the region with the smallest amount of possible colors to choose from so that we
+                    // have to explore less space
+                    let (candidate_i, _) = possible_colors
+                        .iter()
+                        .enumerate()
+                        .map(|(i, &pc)| (i, possible_colors_len(pc)))
+                        .filter(|(_, pcl)| {
+                            // regions that have a single possible color are fixed and cannot be
+                            // changed, aka they're not candidates
+                            *pcl != 1
+                        })
+                        .min_by_key(|(_, pcl)| *pcl)?;
+
+                    // try all the possible colors for the candidate and recursively find a solution
+                    let pcs = possible_colors[candidate_i];
+                    self.stack.extend(
+                        [Color::C1, Color::C2, Color::C3, Color::C4]
+                            .iter()
+                            .rev()
+                            .filter(|&&c| has_color(pcs, c))
+                            .map(|&c| {
+                                let mut new_possible_colors = possible_colors.clone();
+                                new_possible_colors[candidate_i] = c as u8;
+                                new_possible_colors
+                            }),
+                    );
+                }
             }
         }
 
         None
+    }
+}
+
+fn remove_conflicts(possible_colors: &mut [u8], map: &Map) -> SolutionState {
+    loop {
+        // first find regions with a single possible colors and remove that color from its
+        // neighbors until no regions change its respective colors. If any of the regions cannot be
+        // colored then this map cannot be colored. On the other hand, if all the regions have a
+        // single possible color then that's the solution.
+        let mut stalled = true;
+        let mut solved = true;
+
+        for rid in 0..possible_colors.len() {
+            let c = possible_colors[rid];
+            if c == 0 {
+                return SolutionState::CannotSolve;
+            }
+
+            if c.count_ones() != 1 {
+                solved = false;
+                continue;
+            }
+
+            for &neigh in &map.regions[rid].neighbors {
+                let old = possible_colors[neigh];
+                possible_colors[neigh] &= !c;
+
+                if old != possible_colors[neigh] {
+                    stalled = false;
+                    solved = false;
+                }
+            }
+        }
+
+        if stalled {
+            break if solved {
+                SolutionState::Solved
+            } else {
+                SolutionState::Unknown
+            };
+        }
     }
 }
