@@ -1,3 +1,4 @@
+use std::collections::HashSet;
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -8,7 +9,7 @@ use rand::prelude::*;
 use structopt::StructOpt;
 
 use map_4col::colormap::{Color, ColorMap};
-use map_4col::map::Map;
+use map_4col::map::{Map, Point};
 
 /// Simple program to generate maps colored following the 4 color theorem.
 #[derive(Debug, StructOpt)]
@@ -60,7 +61,7 @@ fn main() -> io::Result<()> {
         opts.height.unwrap_or(default_h),
     );
 
-    let pivots = Map::random_pivots(&mut thread_rng(), opts.nregions, dim);
+    let pivots = random_pivots(opts.nregions, dim);
     let m = Map::voronoi_like(pivots, dim);
     let cm = ColorMap::color(&m).unwrap();
 
@@ -131,6 +132,8 @@ fn dump_terminal(dim: (u16, u16), m: &Map, cm: &ColorMap) {
 fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -> io::Result<()> {
     let mut f = fs::File::create(filename)?;
 
+    let stroke_width = ((f32::from(dim.0) * f32::from(dim.1)) / (400.0 * 800.0) * 2.5).min(5.0);
+
     writeln!(
         f,
         r#"<?xml version="1.0" encoding="UTF-8"?>
@@ -150,8 +153,9 @@ fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -
 
         writeln!(
             f,
-            r#"<polygon points="{}" stroke-width="5" stroke="black" fill="{}" />"#,
+            r#"<polygon points="{}" stroke-width="{}" stroke="black" fill="{}" />"#,
             points,
+            stroke_width,
             match cm.color_of_region(rid) {
                 Color::C1 => "#3604ff",
                 Color::C2 => "#ffde00",
@@ -164,4 +168,15 @@ fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -
     writeln!(f, "</svg>")?;
 
     Ok(())
+}
+
+fn random_pivots(npivots: u16, (width, height): (u16, u16)) -> HashSet<Point> {
+    let mut rng = thread_rng();
+    (0..npivots)
+        .map(|_| {
+            let x = rng.gen_range(0, width);
+            let y = rng.gen_range(0, height);
+            (x, y)
+        })
+        .collect::<HashSet<_>>()
 }
