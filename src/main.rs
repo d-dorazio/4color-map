@@ -80,10 +80,6 @@ fn dump_terminal(dim: (u16, u16), m: &Map, cm: &ColorMap) {
     let c2 = " ".on_blue().dimmed().to_string();
     let c3 = " ".on_green().dimmed().to_string();
     let c4 = " ".on_yellow().dimmed().to_string();
-    let p1 = "X".on_red().to_string();
-    let p2 = "X".on_blue().to_string();
-    let p3 = "X".on_green().to_string();
-    let p4 = "X".on_yellow().to_string();
 
     let mut dbg_display = vec![vec![" "; usize::from(dim.0)]; usize::from(dim.1)];
     for (y, row) in m.raster.iter().enumerate() {
@@ -113,17 +109,22 @@ fn dump_terminal(dim: (u16, u16), m: &Map, cm: &ColorMap) {
     //     }
     // }
 
-    for (rid, r) in m.regions.iter().enumerate() {
-        let x = usize::from(r.pivot.0);
-        let y = usize::from(r.pivot.1);
+    // let p1 = "X".on_red().to_string();
+    // let p2 = "X".on_blue().to_string();
+    // let p3 = "X".on_green().to_string();
+    // let p4 = "X".on_yellow().to_string();
+    // for (rid, r) in m.regions.iter().enumerate() {
+    //     let x = usize::from(r.pivot.0);
+    //     let y = usize::from(r.pivot.1);
 
-        dbg_display[y][x] = match cm.color_of_region(rid) {
-            Color::C1 => &p1,
-            Color::C2 => &p2,
-            Color::C3 => &p3,
-            Color::C4 => &p4,
-        };
-    }
+    //     dbg_display[y][x] = match cm.color_of_region(rid) {
+    //         Color::C1 => &p1,
+    //         Color::C2 => &p2,
+    //         Color::C3 => &p3,
+    //         Color::C4 => &p4,
+    //     };
+    // }
+
     for r in dbg_display {
         let s = r.into_iter().collect::<String>();
         println!("{}", s);
