@@ -1,5 +1,4 @@
-use crate::map::RegionId;
-use crate::Map;
+use crate::map::{Map, RegionId};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct ColorMap {

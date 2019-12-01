@@ -1,6 +1,3 @@
-mod colormap;
-mod map;
-
 use std::fs;
 use std::io;
 use std::io::Write;
@@ -10,8 +7,8 @@ use colored::Colorize;
 use rand::prelude::*;
 use structopt::StructOpt;
 
-use crate::colormap::*;
-use crate::map::Map;
+use map_4col::colormap::{Color, ColorMap};
+use map_4col::map::Map;
 
 /// Simple program to generate maps colored following the 4 color theorem.
 #[derive(Debug, StructOpt)]
