@@ -146,7 +146,7 @@ fn dump_svg(filename: &path::PathBuf, dim: (u16, u16), m: &Map, cm: &ColorMap) -
 
     for (rid, r) in m.regions.iter().enumerate() {
         let points = r
-            .connected_boundary()
+            .boundary_polyline()
             .into_iter()
             .map(|(x, y)| format!("{},{} ", x, y))
             .collect::<String>();

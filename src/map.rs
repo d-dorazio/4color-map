@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 
 pub type Point = (u16, u16);
 pub type RegionId = usize;
@@ -106,24 +106,72 @@ impl Map {
 }
 
 impl Region {
-    pub fn connected_boundary(&self) -> Vec<Point> {
-        let mut b = self.boundary.iter().cloned().collect::<Vec<_>>();
+    /// Return the boundary as a polyline.
+    pub fn boundary_polyline(&self) -> Vec<Point> {
+        // the idea here to connect all the points in the boundary is to pick a random point and
+        // start following it along a direction until we reach the starting point or there are no
+        // more points to consider.
 
-        for i in 1..b.len() {
-            let p = b[i - 1];
-            let closest_i = i + b[i..]
-                .iter()
-                .enumerate()
-                .min_by_key(|(_, pp)| {
-                    (i32::from(pp.0) - i32::from(p.0)).abs()
-                        + (i32::from(pp.1) - i32::from(p.1)).abs()
-                })
-                .map(|(i, _)| i)
-                .unwrap();
-
-            b.swap(i, closest_i);
+        let mut cb = vec![];
+        if self.boundary.is_empty() {
+            return cb;
         }
 
-        b
+        // collecting into a btreeset allows to quickly find the minimum which is used as the
+        // starting point of the polyline
+        let mut bs = self
+            .boundary
+            .iter()
+            .map(|(x, y)| (i32::from(*x), i32::from(*y)))
+            .collect::<BTreeSet<_>>();
+
+        const DIRS: [(i32, i32); 8] = [
+            (0, -1),
+            (-1, -1),
+            (-1, 0),
+            (-1, 1),
+            (0, 1),
+            (1, 1),
+            (1, 0),
+            (1, -1),
+        ];
+
+        let start_p = *bs.iter().next().unwrap();
+        let mut cur_p = start_p;
+        let mut cur_dir = 0;
+
+        loop {
+            cb.push((cur_p.0 as u16, cur_p.1 as u16));
+            bs.remove(&cur_p);
+
+            let next = (0..DIRS.len())
+                .map(|i| {
+                    let i = (cur_dir + i) % DIRS.len();
+                    let d = DIRS[i];
+                    (i, (cur_p.0 + d.0, cur_p.1 + d.1))
+                })
+                .find(|(_, p)| bs.contains(p));
+
+            let (new_dir, new_p) = match next {
+                None => break,
+                Some(p) => p,
+            };
+
+            if new_p == start_p {
+                break;
+            }
+
+            // if the direction didn't change then the new point is colinear with the previous and
+            // we can replace the previous point with the new one. However, make sure to always
+            // keep the first point of the polyline.
+            if cur_p != start_p && cur_dir == new_dir {
+                cb.pop();
+            }
+
+            cur_p = new_p;
+            cur_dir = new_dir;
+        }
+
+        cb
     }
 }
