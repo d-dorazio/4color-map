@@ -174,8 +174,8 @@ fn random_pivots(npivots: u16, (width, height): (u16, u16)) -> HashSet<Point> {
     let mut rng = thread_rng();
     (0..npivots)
         .map(|_| {
-            let x = rng.gen_range(0, width);
-            let y = rng.gen_range(0, height);
+            let x = rng.gen_range(0..width);
+            let y = rng.gen_range(0..height);
             (x, y)
         })
         .collect::<HashSet<_>>()
